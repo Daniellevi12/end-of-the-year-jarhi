@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import EventForm from './EventForm'; // Import the form
 import axios from 'axios';
+import { Link } from 'react-router-dom';
+
+// Inside Dashboard return:
+<Link to="/create-event">
+  <button style={{ padding: '10px 20px', cursor: 'pointer' }}>+ Create New Event</button>
+</Link>
 
 const Dashboard = () => {
   const [events, setEvents] = useState([]);
