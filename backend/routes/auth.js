@@ -56,4 +56,21 @@ router.post("/login", async (req, res) => {
     }
 });
 
+// SEARCH USERS BY NAME
+router.get("/users/search", async (req, res) => {
+    const { query } = req.query;
+    try {
+        // We use 'name' here because that's what is in your Register route
+        const users = await User.find({
+            name: { $regex: query, $options: "i" }
+        }).select("name _id email");
+
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: "Search failed", error: err.message });
+    }
+});
+
+module.exports = router; // Keep this at the very bottom
+
 module.exports = router;
