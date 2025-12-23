@@ -4,6 +4,7 @@ import Login from "./components/Login";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
 import Welcome from "./components/pages/Welcome";
+import EventForm from "./components/EventForm";
 
 
 
@@ -16,6 +17,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/create-event" element={<EventForm />} />
         </Routes>
       </Router>
     </AuthProvider>
