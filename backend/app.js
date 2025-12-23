@@ -3,6 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const authRoute = require("./routes/auth");
+const eventRoute = require("./routes/events");
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(cors({
 
 // Routes
 app.use("/api/auth", authRoute);
+app.use("/api/events", eventRoute);
 
 app.get("/", (req, res) => {
   res.send("API is running ✔");

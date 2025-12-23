@@ -1,22 +1,45 @@
-import { useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import EventForm from './EventForm'; // Import the form
+import axios from 'axios';
 
 const Dashboard = () => {
-  const { user, logout } = useContext(AuthContext); // <- MUST include logout
-  const navigate = useNavigate();
+  const [events, setEvents] = useState([]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/"); // redirect to welcome
+  // Function to fetch events so we can see them on the dashboard
+  const fetchEvents = async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/events');
+      setEvents(res.data);
+    } catch (err) {
+      console.error("Error fetching events", err);
+    }
   };
 
-  if (!user) return <p>You are not logged in.</p>;
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
   return (
-    <div>
-      <h2>Welcome, {user.name || "User"}!</h2>
-      <button onClick={handleLogout}>Logout</button>
+    <div style={{ padding: '20px' }}>
+      <h1>User Dashboard</h1>
+
+      <section style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '15px' }}>
+        <h3>Create a New Event</h3>
+        {/* We pass fetchEvents as a prop so the list updates automatically after saving */}
+        <EventForm onEventCreated={fetchEvents} />
+      </section>
+
+      <section>
+        <h3>Your Events</h3>
+        <div className="event-list">
+          {events.length === 0 ? <p>No events found.</p> : events.map(event => (
+            <div key={event._id} style={{ borderBottom: '1px solid #eee', padding: '10px' }}>
+              <h4>{event.name}</h4>
+              <p>{new Date(event.date).toLocaleDateString()} - {event.location}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };
