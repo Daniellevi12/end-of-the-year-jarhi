@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import EventForm from './EventForm'; // Import the form
+import EventForm from './EventForm';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 const Dashboard = () => {
@@ -10,303 +10,90 @@ const Dashboard = () => {
   const { user, logout } = useContext(AuthContext) || {};
   const navigate = useNavigate();
 
-  // Function to fetch events so we can see them on the dashboard
+  // Match your backend 'id' key
+  const currentUserId = user?.id || user?._id;
+
   const fetchEvents = async () => {
+    if (!currentUserId) return;
     try {
-      const res = await axios.get('http://localhost:5000/api/events');
+      // Passing the correct ID key to the backend
+      const res = await axios.get(`http://localhost:5000/api/events?userId=${currentUserId}`);
       setEvents(res.data);
     } catch (err) {
-      console.error("Error fetching events", err);
+      console.error("Fetch error", err);
     }
   };
 
   useEffect(() => {
     fetchEvents();
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  }, [currentUserId]);
 
   const styles = {
-    container: {
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '30px 20px',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '40px',
-      maxWidth: '1200px',
-      margin: '0 auto 40px',
-      color: 'white',
-    },
-    title: {
-      fontSize: '36px',
-      fontWeight: '700',
-      textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-    },
-    userInfo: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '20px',
-    },
-    userName: {
-      fontSize: '18px',
-      fontWeight: '600',
-    },
-    logoutBtn: {
-      padding: '10px 20px',
-      backgroundColor: '#f44336',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-    },
-    content: {
-      maxWidth: '1200px',
-      margin: '0 auto',
-    },
-    section: {
-      marginBottom: '40px',
-    },
-    sectionTitle: {
-      fontSize: '28px',
-      fontWeight: '700',
-      marginBottom: '20px',
-      color: 'white',
-      textShadow: '1px 1px 2px rgba(0,0,0,0.2)',
-    },
-    formCard: {
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '30px',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-      marginBottom: '20px',
-    },
-    toggleBtn: {
-      padding: '10px 20px',
-      backgroundColor: '#667eea',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      marginBottom: '20px',
-      transition: 'all 0.3s ease',
-    },
-    eventGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: '20px',
-    },
-    eventCard: {
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '20px',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-      transition: 'all 0.3s ease',
-      borderLeft: '5px solid #667eea',
-    },
-    eventCardHover: {
-      transform: 'translateY(-5px)',
-      boxShadow: '0 15px 40px rgba(0,0,0,0.25)',
-    },
-    eventTitle: {
-      fontSize: '22px',
-      fontWeight: '700',
-      color: '#333',
-      marginBottom: '10px',
-    },
-    eventInfo: {
-      color: '#666',
-      fontSize: '14px',
-      lineHeight: '1.6',
-      marginBottom: '8px',
-    },
-    eventLink: {
-      color: '#667eea',
-      textDecoration: 'none',
-      fontWeight: '600',
-      fontSize: '14px',
-      cursor: 'pointer',
-      marginTop: '12px',
-      display: 'inline-block',
-    },
-    emptyState: {
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '50px 30px',
-      textAlign: 'center',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-    },
-    emptyStateIcon: {
-      fontSize: '48px',
-      marginBottom: '15px',
-    },
-    emptyStateText: {
-      fontSize: '18px',
-      color: '#666',
-      marginBottom: '20px',
-    },
+    container: { minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '40px 20px', fontFamily: 'Inter, Roboto, Arial, sans-serif' },
+    wrapper: { maxWidth: '1100px', margin: '0 auto' },
+    headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white', marginBottom: '30px' },
+    userActions: { display: 'flex', alignItems: 'center', gap: '12px' },
+    smallBtn: { padding: '8px 14px', backgroundColor: '#ffffff22', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', cursor: 'pointer' },
+    primaryBtn: { padding: '8px 15px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' },
+    card: { backgroundColor: 'white', padding: '25px', borderRadius: '15px', marginBottom: '30px', boxShadow: '0 6px 20px rgba(0,0,0,0.08)' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
+    eventItem: { backgroundColor: 'white', padding: '18px', borderRadius: '12px', borderLeft: '6px solid #667eea', boxShadow: '0 6px 18px rgba(102,126,234,0.07)', transition: 'transform .15s ease, box-shadow .15s ease', cursor: 'default' },
+    tag: { fontSize: '11px', padding: '3px 8px', borderRadius: '4px', backgroundColor: '#eef2ff', color: '#334155', fontWeight: '700' },
+    empty: { textAlign: 'center', color: 'white', padding: '50px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '15px' }
   };
 
   return (
     <div style={styles.container}>
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          position: "absolute",
-          top: "20px",
-          left: "20px",
-          padding: "10px 15px",
-          backgroundColor: "white",
-          color: "#667eea",
-          border: "none",
-          borderRadius: "8px",
-          fontWeight: "600",
-          cursor: "pointer",
-          boxShadow: "0 4px 15px rgba(0, 0, 0, 0.2)",
-          transition: "all 0.3s ease",
-          zIndex: "100",
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.transform = "translateY(-2px)";
-          e.target.style.boxShadow = "0 6px 20px rgba(0, 0, 0, 0.3)";
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.transform = "none";
-          e.target.style.boxShadow = "0 4px 15px rgba(0, 0, 0, 0.2)";
-        }}
-      >
-        ← Home
-      </button>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Dashboard</h1>
-        <div style={styles.userInfo}>
-          {user && <span style={styles.userName}>👋 Welcome, {user.name}!</span>}
-          <button
-            onClick={handleLogout}
-            style={styles.logoutBtn}
-            onMouseEnter={(e) => {
-              e.target.style.opacity = '0.9';
-              e.target.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.opacity = '1';
-              e.target.style.transform = 'none';
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.content}>
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>✨ Create a New Event</h2>
-          <div style={styles.formCard}>
-            {!showForm ? (
-              <button
-                style={styles.toggleBtn}
-                onClick={() => setShowForm(true)}
-                onMouseEnter={(e) => {
-                  e.target.style.opacity = '0.9';
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 5px 15px rgba(102, 126, 234, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.opacity = '1';
-                  e.target.style.transform = 'none';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                + Add New Event
-              </button>
-            ) : (
-              <>
-                <button
-                  style={styles.toggleBtn}
-                  onClick={() => setShowForm(false)}
-                  onMouseEnter={(e) => {
-                    e.target.style.opacity = '0.9';
-                    e.target.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.opacity = '1';
-                    e.target.style.transform = 'none';
-                  }}
-                >
-                  ✕ Close
-                </button>
-                <EventForm onEventCreated={() => {
-                  fetchEvents();
-                  setShowForm(false);
-                }} />
-              </>
-            )}
+      <div style={styles.wrapper}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white', marginBottom: '30px' }}>
+          <h1>📊 Dashboard</h1>
+          <div style={styles.userActions}>
+            <span style={{ marginRight: '6px' }}>Hi, {user?.name}</span>
+            <button onClick={() => navigate('/')} style={styles.smallBtn}>⤺ First Page</button>
+            <button onClick={() => { logout(); navigate('/'); }} style={styles.primaryBtn}>Logout</button>
           </div>
         </div>
 
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>🎉 Your Events</h2>
-          {events.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyStateIcon}>📭</div>
-              <p style={styles.emptyStateText}>No events yet. Create your first event to get started!</p>
-              <button
-                style={styles.toggleBtn}
-                onClick={() => setShowForm(true)}
-                onMouseEnter={(e) => {
-                  e.target.style.opacity = '0.9';
-                  e.target.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.opacity = '1';
-                  e.target.style.transform = 'none';
-                }}
-              >
-                Create Event
-              </button>
-            </div>
-          ) : (
-            <div style={styles.eventGrid}>
-              {events.map(event => (
-                <div
-                  key={event._id}
-                  style={styles.eventCard}
-                  onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.eventCardHover)}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.15)';
-                  }}
-                >
-                  <h3 style={styles.eventTitle}>🎊 {event.name}</h3>
-                  <p style={styles.eventInfo}>
-                    📅 <strong>{new Date(event.date).toLocaleDateString()}</strong>
-                  </p>
-                  <p style={styles.eventInfo}>
-                    📍 {event.location}
-                  </p>
-                  {event.description && (
-                    <p style={styles.eventInfo}>
-                      📝 {event.description.substring(0, 60)}...
-                    </p>
-                  )}
-                  <a style={styles.eventLink}>View Details →</a>
-                </div>
-              ))}
-            </div>
+        <div style={styles.card}>
+          <button onClick={() => setShowForm(!showForm)} style={{ marginBottom: showForm ? '20px' : '0', cursor: 'pointer' }}>
+            {showForm ? "✕ Close Form" : "+ Create New Event"}
+          </button>
+          {showForm && (
+            <EventForm
+              user={user}
+              onEventCreated={() => { fetchEvents(); setShowForm(false); }}
+            />
           )}
         </div>
+
+        <h2 style={{ color: 'white', marginBottom: '20px' }}>Your Events</h2>
+
+        {events.length === 0 ? (
+          <div style={styles.empty}>
+            <h3>No events at the moment.</h3>
+            <p>Create an event or wait for an invite!</p>
+          </div>
+        ) : (
+          <div style={styles.grid}>
+            {events.map(e => (
+              <div key={e._id} style={styles.eventItem}>
+                <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={styles.tag}>
+                    {String(e.creator?._id || e.creator) === String(currentUserId) ? "Organizer" : "Invited"}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#667085' }}>{(e.attendees?.length ?? e.attendeesCount ?? 0)} attendee{(e.attendees?.length ?? e.attendeesCount ?? 0) !== 1 ? 's' : ''}</span>
+                </div>
+
+                <h4 style={{ margin: '0 0 10px 0' }}>{e.name}</h4>
+                <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>📅 {new Date(e.date).toLocaleDateString()}</p>
+                <p style={{ color: '#666', fontSize: '14px', margin: '6px 0 10px 0' }}>📍 {e.location}</p>
+                {e.description && (
+                  <p style={{ color: '#444', fontSize: '13px', marginTop: '6px' }}>{e.description.length > 120 ? e.description.slice(0, 120) + '...' : e.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
