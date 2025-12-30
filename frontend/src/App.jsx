@@ -6,7 +6,12 @@ import Dashboard from "./components/Dashboard";
 import Welcome from "./components/pages/Welcome";
 import EventForm from "./components/EventForm";
 
+// 1. Import Axios
+import axios from "axios";
 
+// 2. Configure Global Base URL
+// This points to YOUR PC's IP where the backend is running
+axios.defaults.baseURL = "http://10.118.30.220:5000"; // change ip to ip now
 
 function App() {
   return (
