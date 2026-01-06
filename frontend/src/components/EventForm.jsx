@@ -26,7 +26,7 @@ const EventForm = ({ onEventCreated, user }) => {
         try {
             const eventData = {
                 ...formData,
-                attendees: selectedUsers.map(u => u._id),
+                invitedGuests: selectedUsers.map(u => u._id),
                 creator: currentUserId
             };
             await axios.post('http://localhost:5000/api/events', eventData);
@@ -34,7 +34,7 @@ const EventForm = ({ onEventCreated, user }) => {
             setFormData({ name: '', date: '', location: '', description: '' });
             setSelectedUsers([]);
             setSearchTerm('');
-        } catch (err) { alert(err.response?.data?.message || "Error"); }
+        } catch (err) { alert(err.response?.data?.message || "Error creating event"); }
     };
 
     const styles = {

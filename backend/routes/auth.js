@@ -34,18 +34,32 @@ router.post("/login", async (req, res) => {
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "secret", { expiresIn: "1d" });
 
+        // Set JWT token as HTTP-only cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         res.status(200).json({
             message: "Login successful",
+            token: token,
             user: {
-                id: user._id, // Notice your backend uses 'id' here
+                id: user._id,
                 name: user.name,
                 email: user.email
-            },
-            token
+            }
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
+});
+
+// LOGOUT
+router.post("/logout", (req, res) => {
+    res.clearCookie('token');
+    res.status(200).json({ message: "Logout successful" });
 });
 
 // SEARCH USERS BY NAME (Updated to exclude current user)

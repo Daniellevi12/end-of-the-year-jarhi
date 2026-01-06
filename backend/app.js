@@ -2,10 +2,19 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const http = require("http");
+const socketIo = require("socket.io");
 const authRoute = require("./routes/auth");
 const eventRoute = require("./routes/events");
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 // JSON parser
 app.use(express.json());
@@ -13,9 +22,7 @@ app.use(express.json());
 // CORS configuration
 // We allow both localhost (for you) and your friend's IP
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://10.118.30.220:3000", // Your IP (Frontend) // change ip to ip now
-  "http://10.118.30.148:3000"  // His IP (Frontend) // change ip to ip now
+  "http://localhost:3000"
 ];
 
 app.use(cors({
@@ -30,6 +37,21 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// Make io accessible to routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// Socket.io connection
+io.on("connection", (socket) => {
+  console.log("✅ User connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
 
 // Routes
 app.use("/api/auth", authRoute);
@@ -47,7 +69,7 @@ mongoose.connect(process.env.MONGO_URI)
     const PORT = process.env.PORT || 5000;
 
     // We listen on 0.0.0.0 so the server is visible to the 10.118.x.x network
-    app.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server is running!`);
       console.log(`Connect via: http://10.118.30.220:${PORT}`);
     });

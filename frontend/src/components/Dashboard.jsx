@@ -3,21 +3,28 @@ import EventForm from './EventForm';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import socket from '../socket';
 
 const Dashboard = () => {
   const [events, setEvents] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
   const [newItemName, setNewItemName] = useState("");
-  const { user, logout } = useContext(AuthContext) || {};
+  const [inviteEmail, setInviteEmail] = useState(""); // State for inviting
+  const [inviteSearchTerm, setInviteSearchTerm] = useState("");
+  const [inviteSearchResults, setInviteSearchResults] = useState([]);
+  const [selectedInviteUser, setSelectedInviteUser] = useState(null);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({ show: false, eventId: null, eventName: '' });
+  const { user, logout, isLoading } = useContext(AuthContext) || {};
   const navigate = useNavigate();
 
   const currentUserId = user?.id || user?._id;
+  const API_BASE = `http://${window.location.hostname}:5000/api/events`;
 
   const fetchEvents = async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || isLoading) return;
     try {
-      const res = await axios.get(`http://localhost:5000/api/events?userId=${currentUserId}`);
+      const res = await axios.get(`${API_BASE}?userId=${currentUserId}`);
       setEvents(res.data);
       if (expandedEvent) {
         const updated = res.data.find(e => e._id === expandedEvent._id);
@@ -26,15 +33,121 @@ const Dashboard = () => {
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchEvents(); }, [currentUserId]);
+  useEffect(() => { 
+    if (!isLoading) {
+      fetchEvents();
+    }
+  }, [currentUserId, isLoading]);
+
+  // Search users for invite when expandedEvent modal is open
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (inviteSearchTerm.length >= 2 && expandedEvent) {
+        try {
+          const res = await axios.get(`http://${window.location.hostname}:5000/api/auth/users/search?query=${inviteSearchTerm}&exclude=${currentUserId}`);
+          setInviteSearchResults(res.data);
+        } catch (err) { console.error(err); }
+      } else { 
+        setInviteSearchResults([]); 
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [inviteSearchTerm, expandedEvent, currentUserId]);
+
+  // Listen for real-time event updates
+  useEffect(() => {
+    socket.on("event_created", (newEvent) => {
+      // Check if current user is related to this event
+      if (String(newEvent.creator._id || newEvent.creator) === String(currentUserId) || 
+          newEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId))) {
+        setEvents(prev => [...prev, newEvent]);
+      }
+    });
+
+    socket.on("event_updated", (updatedEvent) => {
+      // Check if current user is related to this event
+      if (String(updatedEvent.creator._id || updatedEvent.creator) === String(currentUserId) || 
+          updatedEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId))) {
+        setEvents(prev => {
+          // Check if event already exists in the list
+          const exists = prev.find(e => e._id === updatedEvent._id);
+          if (exists) {
+            // Update existing event
+            return prev.map(e => e._id === updatedEvent._id ? updatedEvent : e);
+          } else {
+            // Add new event if user just got invited
+            return [...prev, updatedEvent];
+          }
+        });
+        if (expandedEvent && expandedEvent._id === updatedEvent._id) {
+          setExpandedEvent(updatedEvent);
+        }
+      }
+    });
+
+    socket.on("event_deleted", (data) => {
+      // If the deletion is for a specific user, only they see it deleted
+      if (data.userId && String(data.userId) !== String(currentUserId)) {
+        return; // Only the removed user should see it deleted
+      }
+      setEvents(prev => prev.filter(e => e._id !== data.eventId));
+      if (expandedEvent && expandedEvent._id === data.eventId) {
+        setExpandedEvent(null);
+      }
+    });
+
+    return () => {
+      socket.off("event_created");
+      socket.off("event_updated");
+      socket.off("event_deleted");
+    };
+  }, [currentUserId, expandedEvent]);
+
+  const handleRSVP = async (e, eventId, status) => {
+    e.stopPropagation();
+    try {
+      await axios.post(`${API_BASE}/${eventId}/rsvp`, { userId: currentUserId, status });
+      fetchEvents();
+    } catch (err) { alert(err.response?.data?.message || "Error"); }
+  };
+
+  const handleRemoveAttendee = async (eventId, userId) => {
+    try {
+      await axios.post(`${API_BASE}/${eventId}/remove-guest`, { userId: currentUserId, guestId: userId });
+      fetchEvents();
+    } catch (err) { alert("Error removing attendee"); }
+  };
+
+  const handleInvite = async (e, eventId) => {
+    e.preventDefault();
+    if (!selectedInviteUser) return alert("Please select a user to invite");
+    try {
+      await axios.post(`${API_BASE}/${eventId}/invite`, { guestId: selectedInviteUser._id });
+      setSelectedInviteUser(null);
+      setInviteSearchTerm("");
+      setInviteSearchResults([]);
+      fetchEvents();
+    } catch (err) { alert("Error inviting user"); }
+  };
+
+  const handleDeleteEvent = async (e, eventId) => {
+    e.stopPropagation();
+    const event = events.find(ev => ev._id === eventId);
+    setDeleteConfirmModal({ show: true, eventId, eventName: event?.name || 'this event' });
+  };
+
+  const confirmDeleteEvent = async () => {
+    try {
+      await axios.delete(`${API_BASE}/${deleteConfirmModal.eventId}?userId=${currentUserId}`);
+      setDeleteConfirmModal({ show: false, eventId: null, eventName: '' });
+      fetchEvents();
+    } catch (err) { alert("Error deleting"); }
+  };
 
   const handleAddItem = async (e, eventId) => {
     e.preventDefault();
-    if (!newItemName) return;
     try {
-      await axios.post(`http://localhost:5000/api/events/${eventId}/items`, {
-        itemName: newItemName, userId: currentUserId, userName: user.name
-      });
+      await axios.post(`${API_BASE}/${eventId}/items`, { itemName: newItemName, userId: currentUserId, userName: user.name });
       setNewItemName("");
       fetchEvents();
     } catch (err) { alert("Error adding item"); }
@@ -42,99 +155,238 @@ const Dashboard = () => {
 
   const handleDeleteItem = async (eventId, itemId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/events/${eventId}/items/${itemId}?userId=${currentUserId}`);
+      await axios.delete(`${API_BASE}/${eventId}/items/${itemId}?userId=${currentUserId}`);
       fetchEvents();
-    } catch (err) { alert(err.response?.data?.message || "Unauthorized"); }
+    } catch (err) { alert("Error"); }
   };
 
   const styles = {
-    container: { minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', padding: '40px 20px', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
+    container: { minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', padding: '40px 20px', fontFamily: 'sans-serif' },
     wrapper: { maxWidth: '1100px', margin: '0 auto' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', paddingBottom: '20px', borderBottom: '2px solid rgba(255,255,255,0.5)' },
-    headerTitle: { fontSize: '2.5rem', fontWeight: '700', color: '#2d3436', letterSpacing: '-0.5px' },
-    headerUser: { display: 'flex', alignItems: 'center', gap: '15px' },
-    card: { backgroundColor: 'white', padding: '22px', borderRadius: '16px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', transition: 'all 0.3s ease', border: '1px solid rgba(255,255,255,0.8)', ':hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 25px rgba(0,0,0,0.12)' } },
+    card: { backgroundColor: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', cursor: 'pointer', position: 'relative' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' },
-    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' },
-    modal: { background: 'white', padding: '35px', borderRadius: '20px', width: '90%', maxWidth: '500px', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)' },
-    itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #f0f2f5' },
-    empty: { textAlign: 'center', padding: '100px 20px', color: '#636e72' }
+    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+    modal: { background: 'white', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto' },
+    rsvpGroup: { display: 'flex', gap: '10px', marginTop: '15px' },
+    btnComing: (active) => ({ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: active ? '#00b894' : '#f0f2f5', color: active ? 'white' : '#636e72' }),
+    btnNotComing: (active, disabled) => ({ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontWeight: 'bold', backgroundColor: active ? '#ff7675' : '#f0f2f5', color: active ? 'white' : '#636e72', opacity: disabled ? 0.5 : 1 }),
+    deleteBtn: { position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '18px' }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.wrapper}>
-        <div style={styles.header}>
-          <h1 style={styles.headerTitle}>Dashboard</h1>
-          <div style={styles.headerUser}>
-            <span style={{ fontSize: '16px', color: '#2d3436', fontWeight: '500' }}>Welcome, {user?.name}</span>
-            <button onClick={() => navigate('/')} style={{ padding: '10px 24px', backgroundColor: '#5f7983', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease', fontSize: '14px' }} onMouseOver={(e) => e.target.style.backgroundColor = '#4a5f6b'} onMouseOut={(e) => e.target.style.backgroundColor = '#5f7983'}>← Back to Home</button>
-            <button onClick={() => { logout(); navigate('/'); }} style={{ padding: '10px 24px', backgroundColor: '#ff6b6b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease', fontSize: '14px' }} onMouseOver={(e) => e.target.style.backgroundColor = '#ff5252'} onMouseOut={(e) => e.target.style.backgroundColor = '#ff6b6b'}>Logout</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+          <div>
+            <h1 style={{ margin: '0 0 5px 0' }}>Dashboard</h1>
+            <p style={{ margin: 0, fontSize: '16px', color: '#636e72' }}>👋 Welcome, <strong>{user?.name || 'User'}</strong>!</p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => navigate('/')} style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #00b894 0%, #00a382 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0, 184, 148, 0.4)', transition: 'transform 0.2s' }}>🏠 Home</button>
+            <button onClick={() => { logout(); navigate('/'); }} style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)', transition: 'transform 0.2s' }}>🚪 Logout</button>
           </div>
         </div>
 
-        <div style={{ marginBottom: '40px' }}>
-          <button onClick={() => setShowForm(!showForm)} style={{ padding: '12px 28px', backgroundColor: '#6c5ce7', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', transition: 'all 0.2s ease', boxShadow: '0 4px 12px rgba(108, 92, 231, 0.3)' }} onMouseOver={(e) => { e.target.style.backgroundColor = '#5f4dd9'; e.target.style.boxShadow = '0 6px 16px rgba(108, 92, 231, 0.4)'; }} onMouseOut={(e) => { e.target.style.backgroundColor = '#6c5ce7'; e.target.style.boxShadow = '0 4px 12px rgba(108, 92, 231, 0.3)'; }}>
-            {showForm ? "✕ Close Form" : "+ Create Event"}
-          </button>
-          {showForm && (
-            <div style={{ background: 'white', padding: '35px', borderRadius: '16px', marginTop: '20px', boxShadow: '0 10px 35px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.5)' }}>
-              <EventForm user={user} onEventCreated={() => { fetchEvents(); setShowForm(false); }} />
-            </div>
-          )}
-        </div>
+        <button onClick={() => setShowForm(!showForm)} style={{ padding: '12px 24px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '10px', marginBottom: '30px' }}>
+          {showForm ? "✕ Close" : "+ Create Event"}
+        </button>
 
-        <h2 style={{ marginBottom: '24px', fontSize: '1.8rem', fontWeight: '700', color: '#2d3436' }}>Upcoming Events</h2>
-        {events.length === 0 ? (
-          <div style={styles.empty}>
-            <h3 style={{ fontSize: '1.4rem', marginBottom: '10px', color: '#2d3436' }}>No events yet</h3>
-            <p style={{ fontSize: '15px', color: '#636e72' }}>Create your first event to get started!</p>
-          </div>
-        ) : (
-          <div style={styles.grid}>
-            {events.map(e => (
-              <div key={e._id} style={{ ...styles.card, ':hover': undefined }} onMouseOver={(el) => { el.currentTarget.style.transform = 'translateY(-6px)'; el.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.12)'; }} onMouseOut={(el) => { el.currentTarget.style.transform = 'translateY(0)'; el.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.08)'; }} onClick={() => setExpandedEvent(e)}>
-                <span style={{ fontSize: '11px', color: '#6c5ce7', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {String(e.creator?._id || e.creator) === String(currentUserId) ? "🎯 Organizer" : "👥 Guest"}
-                </span>
-                <h3 style={{ margin: '12px 0 14px 0', fontSize: '1.3rem', fontWeight: '700', color: '#2d3436' }}>{e.name}</h3>
-                <p style={{ color: '#636e72', fontSize: '14px', marginBottom: '8px' }}>📍 {e.location}</p>
-                <p style={{ color: '#636e72', fontSize: '14px', marginBottom: '12px' }}>📅 {new Date(e.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                <div style={{ marginTop: '14px', fontSize: '13px', color: '#00b894', fontWeight: '600' }}>📦 {e.items?.length || 0} items added</div>
+        {showForm && <div style={{ background: 'white', padding: '20px', borderRadius: '15px', marginBottom: '30px' }}><EventForm user={user} onEventCreated={() => { fetchEvents(); setShowForm(false); }} /></div>}
+
+        <div style={styles.grid}>
+          {events.map(e => {
+            const isCreator = String(e.creator?._id || e.creator) === String(currentUserId);
+            const isAttending = e.attendees?.some(a => String(a._id || a) === String(currentUserId));
+            return (
+              <div key={e._id} style={styles.card} onClick={() => setExpandedEvent(e)}>
+                {isCreator && <button style={styles.deleteBtn} onClick={(event) => handleDeleteEvent(event, e._id)}>✕</button>}
+                <h3>{e.name}</h3>
+                <p>📍 {e.location}</p>
+                <div style={styles.rsvpGroup}>
+                  <button style={styles.btnComing(isAttending)} onClick={(event) => handleRSVP(event, e._id, 'coming')}>✓ Coming</button>
+                  <button disabled={isCreator} style={styles.btnNotComing(!isAttending && !isCreator, isCreator)} onClick={(event) => !isCreator && handleRSVP(event, e._id, 'not-coming')}>{isCreator ? "Organizer" : "✕ Not Coming"}</button>
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+
+        {deleteConfirmModal.show && (
+          <div style={styles.modalOverlay} onClick={() => setDeleteConfirmModal({ show: false, eventId: null, eventName: '' })}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+                <h2 style={{ marginTop: 0, color: '#2d3436' }}>Delete Event?</h2>
+                <p style={{ fontSize: '16px', color: '#636e72', marginBottom: '30px' }}>
+                  Are you sure you want to delete <strong>"{deleteConfirmModal.eventName}"</strong>? This action cannot be undone.
+                </p>
+                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                  <button 
+                    onClick={() => setDeleteConfirmModal({ show: false, eventId: null, eventName: '' })}
+                    style={{ 
+                      padding: '12px 30px', 
+                      background: '#f0f2f5', 
+                      color: '#2d3436', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      transition: 'background 0.3s'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = '#e8eaed'}
+                    onMouseOut={(e) => e.target.style.background = '#f0f2f5'}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={confirmDeleteEvent}
+                    style={{ 
+                      padding: '12px 30px', 
+                      background: '#ff7675', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      transition: 'background 0.3s'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = '#ff6c6c'}
+                    onMouseOut={(e) => e.target.style.background = '#ff7675'}
+                  >
+                    Delete Event
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* MODAL FOR ITEMS */}
         {expandedEvent && (
           <div style={styles.modalOverlay} onClick={() => setExpandedEvent(null)}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '700', color: '#2d3436', marginBottom: '8px' }}>{expandedEvent.name}</h2>
-              <p style={{ color: '#636e72', marginBottom: '24px', fontSize: '15px' }}>Items to bring:</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0 }}>{expandedEvent.name}</h2>
+                <button onClick={() => setExpandedEvent(null)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>←</button>
+              </div>
+              
+              {/* INVITE SECTION (Organizer only) */}
+              {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && (
+                <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #6c5ce7', borderRadius: '8px', position: 'relative' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 'bold' }}>Invite more friends:</p>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Search by name..." 
+                      value={inviteSearchTerm} 
+                      onChange={e => setInviteSearchTerm(e.target.value)} 
+                      style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #ddd', boxSizing: 'border-box' }} 
+                    />
+                    {inviteSearchResults.length > 0 && !selectedInviteUser && (
+                      <div style={{ position: 'absolute', width: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '5px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '5px' }}>
+                        {inviteSearchResults.map(u => (
+                          <div 
+                            key={u._id} 
+                            onClick={() => { 
+                              setSelectedInviteUser(u);
+                              setInviteSearchTerm(u.name);
+                              setInviteSearchResults([]);
+                            }} 
+                            style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }}
+                          >
+                            {u.name} ({u.email})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedInviteUser && (
+                    <div style={{ marginTop: '8px', padding: '8px 10px', backgroundColor: '#f0f2f5', borderRadius: '5px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Selected: <strong>{selectedInviteUser.name}</strong></span>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button 
+                          onClick={() => { 
+                            handleInvite({ preventDefault: () => {} }, expandedEvent._id);
+                          }}
+                          style={{ background: '#6c5ce7', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                        >
+                          ✓ Invite
+                        </button>
+                        <button 
+                          onClick={() => { 
+                            setSelectedInviteUser(null);
+                            setInviteSearchTerm('');
+                          }}
+                          style={{ background: '#ddd', color: '#333', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          ✕ Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              <div style={{ maxHeight: '280px', overflowY: 'auto', marginBottom: '24px', borderRadius: '10px', border: '1px solid #f0f2f5', padding: '12px' }}>
-                {expandedEvent.items.length === 0 && <p style={{ color: '#b2bec3', textAlign: 'center', padding: '20px 0' }}>No items yet. Be the first to add!</p>}
-                {expandedEvent.items.map(item => (
-                  <div key={item._id} style={styles.itemRow}>
-                    <span style={{ flex: 1 }}><strong style={{ color: '#2d3436' }}>{item.name}</strong> <small style={{ color: '#99a9b9', fontSize: '13px' }}>— {item.addedByName}</small></span>
-                    {(String(item.addedBy) === String(currentUserId) || String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId)) && (
-                      <button onClick={() => handleDeleteItem(expandedEvent._id, item._id)} style={{ border: 'none', background: 'none', color: '#ff7675', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px', padding: '4px 8px', transition: 'color 0.2s ease' }} onMouseOver={(e) => e.target.style.color = '#ff5252'} onMouseOut={(e) => e.target.style.color = '#ff7675'}>✕</button>
+              <h4>Who's Coming:</h4>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                {expandedEvent.attendees?.map(a => (
+                  <div key={a._id} style={{ background: '#dfe6e9', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {a.name}
+                    {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && String(a._id) !== String(currentUserId) && (
+                      <button 
+                        onClick={() => handleRemoveAttendee(expandedEvent._id, a._id)}
+                        style={{ background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', padding: '0 2px' }}
+                      >
+                        ✕
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
 
-              <form onSubmit={(e) => handleAddItem(e, expandedEvent._id)} style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
-                <input
-                  placeholder="I'll bring..."
-                  value={newItemName}
-                  onChange={e => setNewItemName(e.target.value)}
-                  style={{ flex: 1, padding: '12px 14px', borderRadius: '10px', border: '1px solid #dfe6e9', fontSize: '15px', fontFamily: 'inherit', transition: 'border-color 0.2s ease' }} onFocus={(e) => e.target.style.borderColor = '#6c5ce7'} onBlur={(e) => e.target.style.borderColor = '#dfe6e9'}
-                />
-                <button type="submit" style={{ padding: '12px 24px', backgroundColor: '#00b894', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s ease', fontSize: '14px' }} onMouseOver={(e) => { e.target.style.backgroundColor = '#00a884'; }} onMouseOut={(e) => { e.target.style.backgroundColor = '#00b894'; }}>Add</button>
+              {/* Who's Not Coming Section */}
+              {expandedEvent.invitedGuests && expandedEvent.invitedGuests.length > 0 && (
+                <>
+                  <h4>Who's Not Coming:</h4>
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                    {expandedEvent.invitedGuests
+                      .filter(guest => !expandedEvent.attendees?.some(a => String(a._id) === String(guest._id || guest)))
+                      .map(guest => (
+                        <div key={guest._id || guest} style={{ background: '#ffcccc', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          {guest.name || 'Unknown User'}
+                          {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && (
+                            <button 
+                              onClick={() => handleRemoveAttendee(expandedEvent._id, guest._id || guest)}
+                              style={{ background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', padding: '0 2px' }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
+              
+              <h4>Items:</h4>
+              <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px' }}>
+                {expandedEvent.items.map(item => (
+                  <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <span>{item.name} ({item.addedByName})</span>
+                    {(String(item.addedBy) === String(currentUserId) || String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId)) && (
+                      <button onClick={() => handleDeleteItem(expandedEvent._id, item._id)} style={{ border: 'none', background: 'none', color: 'red' }}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={(e) => handleAddItem(e, expandedEvent._id)} style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <input placeholder="Add item..." value={newItemName} onChange={e => setNewItemName(e.target.value)} style={{ flex: 1, padding: '8px' }} />
+                <button type="submit" style={{ padding: '8px 15px', background: '#00b894', color: 'white', border: 'none', borderRadius: '5px' }}>Add</button>
               </form>
-              <button onClick={() => setExpandedEvent(null)} style={{ width: '100%', background: '#f0f2f5', border: 'none', padding: '12px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', color: '#636e72', transition: 'all 0.2s ease', fontSize: '14px' }} onMouseOver={(e) => e.target.style.background = '#e0e3e9'} onMouseOut={(e) => e.target.style.background = '#f0f2f5'}>Close</button>
+
+              <button onClick={() => setExpandedEvent(null)} style={{ width: '100%', padding: '12px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '8px', marginTop: '20px', fontWeight: 'bold', cursor: 'pointer' }}>← Back to Dashboard</button>
             </div>
           </div>
         )}
