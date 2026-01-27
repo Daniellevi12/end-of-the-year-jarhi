@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import socket from '../socket';
+import API_BASE_URL from '../config';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -22,7 +23,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const currentUserId = user?.id || user?._id;
-  const API_BASE = `http://${window.location.hostname}:5000/api/events`;
+  const API_BASE = `${API_BASE_URL}/api/events`;
 
   const fetchEvents = async () => {
     if (!currentUserId || isLoading) return;
@@ -47,7 +48,7 @@ const Dashboard = () => {
     const delayDebounceFn = setTimeout(async () => {
       if (inviteSearchTerm.length >= 2 && expandedEvent) {
         try {
-          const res = await axios.get(`http://${window.location.hostname}:5000/api/auth/users/search?query=${inviteSearchTerm}&exclude=${currentUserId}`);
+          const res = await axios.get(`${API_BASE_URL}/api/auth/users/search?query=${inviteSearchTerm}&exclude=${currentUserId}`);
           setInviteSearchResults(res.data);
         } catch (err) { console.error(err); }
       } else { 

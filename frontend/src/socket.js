@@ -1,6 +1,7 @@
 import io from 'socket.io-client';
+import API_BASE_URL from './config';
 
-const socket = io(`http://${window.location.hostname}:5000`, {
+const socket = io(API_BASE_URL, {
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 const EventForm = ({ onEventCreated, user }) => {
     const [formData, setFormData] = useState({ name: '', date: '', location: '', description: '' });
@@ -12,7 +13,7 @@ const EventForm = ({ onEventCreated, user }) => {
         const delayDebounceFn = setTimeout(async () => {
             if (searchTerm.length >= 2) {
                 try {
-                    const res = await axios.get(`http://localhost:5000/api/auth/users/search?query=${searchTerm}&exclude=${currentUserId}`);
+                    const res = await axios.get(`${API_BASE_URL}/api/auth/users/search?query=${searchTerm}&exclude=${currentUserId}`);
                     setSearchResults(res.data);
                 } catch (err) { console.error(err); }
             } else { setSearchResults([]); }
@@ -29,7 +30,7 @@ const EventForm = ({ onEventCreated, user }) => {
                 invitedGuests: selectedUsers.map(u => u._id),
                 creator: currentUserId
             };
-            await axios.post('http://localhost:5000/api/events', eventData);
+            await axios.post(`${API_BASE_URL}/api/events`, eventData);
             onEventCreated();
             setFormData({ name: '', date: '', location: '', description: '' });
             setSelectedUsers([]);
