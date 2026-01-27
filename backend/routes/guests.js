@@ -1,37 +1,21 @@
 const express = require("express");
 const router = express.Router();
-const Guest = require("../models/Guest");
+const guestController = require("../controllers/guestController");
 const { verifyToken } = require("../middleware/authMiddleware");
 
-// GET all guests - PROTECTED
-router.get("/", verifyToken, async (req, res) => {
-  const guests = await Guest.find();
-  res.json(guests);
-});
+// GET all guests for a specific event (requires eventId query parameter)
+router.get("/", verifyToken, guestController.getAllGuests);
 
-// GET guest by ID - PROTECTED
-router.get("/:id", verifyToken, async (req, res) => {
-  const guest = await Guest.findById(req.params.id);
-  res.json(guest);
-});
+// GET guest by ID
+router.get("/:id", verifyToken, guestController.getGuestById);
 
-// POST create guest - PROTECTED
-router.post("/", verifyToken, async (req, res) => {
-  const guest = new Guest(req.body);
-  await guest.save();
-  res.status(201).json(guest);
-});
+// POST create guest
+router.post("/", verifyToken, guestController.createGuest);
 
-// PUT update guest - PROTECTED
-router.put("/:id", verifyToken, async (req, res) => {
-  const guest = await Guest.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(guest);
-});
+// PUT update guest (status, comment, etc.)
+router.put("/:id", verifyToken, guestController.updateGuest);
 
-// DELETE guest - PROTECTED
-router.delete("/:id", verifyToken, async (req, res) => {
-  await Guest.findByIdAndDelete(req.params.id);
-  res.json({ message: "Guest deleted" });
-});
+// DELETE guest
+router.delete("/:id", verifyToken, guestController.deleteGuest);
 
 module.exports = router;

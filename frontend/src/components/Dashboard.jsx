@@ -4,17 +4,20 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import socket from '../socket';
+import './Dashboard.css';
 
 const Dashboard = () => {
   const [events, setEvents] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
   const [newItemName, setNewItemName] = useState("");
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const [inviteEmail, setInviteEmail] = useState(""); // State for inviting
   const [inviteSearchTerm, setInviteSearchTerm] = useState("");
   const [inviteSearchResults, setInviteSearchResults] = useState([]);
   const [selectedInviteUser, setSelectedInviteUser] = useState(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState({ show: false, eventId: null, eventName: '' });
+  const [errorMessage, setErrorMessage] = useState(null);
   const { user, logout, isLoading } = useContext(AuthContext) || {};
   const navigate = useNavigate();
 
@@ -56,18 +59,13 @@ const Dashboard = () => {
 
   // Listen for real-time event updates
   useEffect(() => {
-    socket.on("event_created", (newEvent) => {
-      // Check if current user is related to this event
-      if (String(newEvent.creator._id || newEvent.creator) === String(currentUserId) || 
-          newEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId))) {
-        setEvents(prev => [...prev, newEvent]);
-      }
-    });
-
-    socket.on("event_updated", (updatedEvent) => {
-      // Check if current user is related to this event
-      if (String(updatedEvent.creator._id || updatedEvent.creator) === String(currentUserId) || 
-          updatedEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId))) {
+    const handleEventUpdated = (updatedEvent) => {
+      // Check if current user is related to this event (creator, attendee, or invited guest)
+      const isCreator = String(updatedEvent.creator._id || updatedEvent.creator) === String(currentUserId);
+      const isAttendee = updatedEvent.attendees?.some(a => String(a._id || a) === String(currentUserId));
+      const isInvited = updatedEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId));
+      
+      if (isCreator || isAttendee || isInvited) {
         setEvents(prev => {
           // Check if event already exists in the list
           const exists = prev.find(e => e._id === updatedEvent._id);
@@ -79,29 +77,52 @@ const Dashboard = () => {
             return [...prev, updatedEvent];
           }
         });
-        if (expandedEvent && expandedEvent._id === updatedEvent._id) {
-          setExpandedEvent(updatedEvent);
-        }
+        
+        // Update expanded event if it's currently open
+        setExpandedEvent(prevExpanded => {
+          if (prevExpanded && prevExpanded._id === updatedEvent._id) {
+            return updatedEvent;
+          }
+          return prevExpanded;
+        });
       }
-    });
+    };
 
-    socket.on("event_deleted", (data) => {
+    const handleEventCreated = (newEvent) => {
+      // Check if current user is related to this event
+      const isCreator = String(newEvent.creator._id || newEvent.creator) === String(currentUserId);
+      const isAttendee = newEvent.attendees?.some(a => String(a._id || a) === String(currentUserId));
+      const isInvited = newEvent.invitedGuests?.some(g => String(g._id || g) === String(currentUserId));
+      
+      if (isCreator || isAttendee || isInvited) {
+        setEvents(prev => [...prev, newEvent]);
+      }
+    };
+
+    const handleEventDeleted = (data) => {
       // If the deletion is for a specific user, only they see it deleted
       if (data.userId && String(data.userId) !== String(currentUserId)) {
         return; // Only the removed user should see it deleted
       }
       setEvents(prev => prev.filter(e => e._id !== data.eventId));
-      if (expandedEvent && expandedEvent._id === data.eventId) {
-        setExpandedEvent(null);
-      }
-    });
+      setExpandedEvent(prevExpanded => {
+        if (prevExpanded && prevExpanded._id === data.eventId) {
+          return null;
+        }
+        return prevExpanded;
+      });
+    };
+
+    socket.on("event_created", handleEventCreated);
+    socket.on("event_updated", handleEventUpdated);
+    socket.on("event_deleted", handleEventDeleted);
 
     return () => {
-      socket.off("event_created");
-      socket.off("event_updated");
-      socket.off("event_deleted");
+      socket.off("event_created", handleEventCreated);
+      socket.off("event_updated", handleEventUpdated);
+      socket.off("event_deleted", handleEventDeleted);
     };
-  }, [currentUserId, expandedEvent]);
+  }, [currentUserId]);
 
   const handleRSVP = async (e, eventId, status) => {
     e.stopPropagation();
@@ -146,65 +167,57 @@ const Dashboard = () => {
 
   const handleAddItem = async (e, eventId) => {
     e.preventDefault();
+    if (isAddingItem || !newItemName.trim()) return; // Prevent duplicate submissions and empty items
+    
+    setIsAddingItem(true);
     try {
       await axios.post(`${API_BASE}/${eventId}/items`, { itemName: newItemName, userId: currentUserId, userName: user.name });
       setNewItemName("");
-      fetchEvents();
-    } catch (err) { alert("Error adding item"); }
+    } catch (err) { 
+      alert(err.response?.data?.message || "Error adding item"); 
+    } finally {
+      setIsAddingItem(false);
+    }
   };
 
   const handleDeleteItem = async (eventId, itemId) => {
     try {
       await axios.delete(`${API_BASE}/${eventId}/items/${itemId}?userId=${currentUserId}`);
-      fetchEvents();
     } catch (err) { alert("Error"); }
   };
 
-  const styles = {
-    container: { minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', padding: '40px 20px', fontFamily: 'sans-serif' },
-    wrapper: { maxWidth: '1100px', margin: '0 auto' },
-    card: { backgroundColor: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', cursor: 'pointer', position: 'relative' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' },
-    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-    modal: { background: 'white', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto' },
-    rsvpGroup: { display: 'flex', gap: '10px', marginTop: '15px' },
-    btnComing: (active) => ({ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: active ? '#00b894' : '#f0f2f5', color: active ? 'white' : '#636e72' }),
-    btnNotComing: (active, disabled) => ({ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontWeight: 'bold', backgroundColor: active ? '#ff7675' : '#f0f2f5', color: active ? 'white' : '#636e72', opacity: disabled ? 0.5 : 1 }),
-    deleteBtn: { position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '18px' }
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.wrapper}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+    <div className="dashboard-container">
+      <div className="dashboard-wrapper">
+        <div className="dashboard-header">
           <div>
-            <h1 style={{ margin: '0 0 5px 0' }}>Dashboard</h1>
-            <p style={{ margin: 0, fontSize: '16px', color: '#636e72' }}>👋 Welcome, <strong>{user?.name || 'User'}</strong>!</p>
+            <h1>Dashboard</h1>
+            <p>👋 Welcome, <strong>{user?.name || 'User'}</strong>!</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => navigate('/')} style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #00b894 0%, #00a382 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0, 184, 148, 0.4)', transition: 'transform 0.2s' }}>🏠 Home</button>
-            <button onClick={() => { logout(); navigate('/'); }} style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)', transition: 'transform 0.2s' }}>🚪 Logout</button>
+          <div className="dashboard-button-group">
+            <button onClick={() => navigate('/')} className="btn-home">🏠 Home</button>
+            <button onClick={() => { logout(); navigate('/'); }} className="btn-logout">🚪 Logout</button>
           </div>
         </div>
 
-        <button onClick={() => setShowForm(!showForm)} style={{ padding: '12px 24px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '10px', marginBottom: '30px' }}>
+        <button onClick={() => setShowForm(!showForm)} className="btn-create-event">
           {showForm ? "✕ Close" : "+ Create Event"}
         </button>
 
-        {showForm && <div style={{ background: 'white', padding: '20px', borderRadius: '15px', marginBottom: '30px' }}><EventForm user={user} onEventCreated={() => { fetchEvents(); setShowForm(false); }} /></div>}
+        {showForm && <div className="event-form-container"><EventForm user={user} onEventCreated={() => { fetchEvents(); setShowForm(false); }} /></div>}
 
-        <div style={styles.grid}>
+        <div className="events-grid">
           {events.map(e => {
             const isCreator = String(e.creator?._id || e.creator) === String(currentUserId);
             const isAttending = e.attendees?.some(a => String(a._id || a) === String(currentUserId));
             return (
-              <div key={e._id} style={styles.card} onClick={() => setExpandedEvent(e)}>
-                {isCreator && <button style={styles.deleteBtn} onClick={(event) => handleDeleteEvent(event, e._id)}>✕</button>}
+              <div key={e._id} className="event-card" onClick={() => setExpandedEvent(e)}>
+                {isCreator && <button className="event-card-delete-btn" onClick={(event) => handleDeleteEvent(event, e._id)}>✕</button>}
                 <h3>{e.name}</h3>
                 <p>📍 {e.location}</p>
-                <div style={styles.rsvpGroup}>
-                  <button style={styles.btnComing(isAttending)} onClick={(event) => handleRSVP(event, e._id, 'coming')}>✓ Coming</button>
-                  <button disabled={isCreator} style={styles.btnNotComing(!isAttending && !isCreator, isCreator)} onClick={(event) => !isCreator && handleRSVP(event, e._id, 'not-coming')}>{isCreator ? "Organizer" : "✕ Not Coming"}</button>
+                <div className="rsvp-group">
+                  <button className={`btn-coming ${isAttending ? 'active' : 'inactive'}`} onClick={(event) => handleRSVP(event, e._id, 'coming')}>✓ Coming</button>
+                  <button disabled={isCreator} className={`btn-not-coming ${!isAttending && !isCreator ? 'active' : 'inactive'}`} onClick={(event) => !isCreator && handleRSVP(event, e._id, 'not-coming')}>{isCreator ? "Organizer" : "✕ Not Coming"}</button>
                 </div>
               </div>
             );
@@ -212,48 +225,24 @@ const Dashboard = () => {
         </div>
 
         {deleteConfirmModal.show && (
-          <div style={styles.modalOverlay} onClick={() => setDeleteConfirmModal({ show: false, eventId: null, eventName: '' })}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
-                <h2 style={{ marginTop: 0, color: '#2d3436' }}>Delete Event?</h2>
-                <p style={{ fontSize: '16px', color: '#636e72', marginBottom: '30px' }}>
+          <div className="modal-overlay" onClick={() => setDeleteConfirmModal({ show: false, eventId: null, eventName: '' })}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="delete-confirm-content">
+                <div className="delete-confirm-icon">⚠️</div>
+                <h2>Delete Event?</h2>
+                <p>
                   Are you sure you want to delete <strong>"{deleteConfirmModal.eventName}"</strong>? This action cannot be undone.
                 </p>
-                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                <div className="delete-button-group">
                   <button 
                     onClick={() => setDeleteConfirmModal({ show: false, eventId: null, eventName: '' })}
-                    style={{ 
-                      padding: '12px 30px', 
-                      background: '#f0f2f5', 
-                      color: '#2d3436', 
-                      border: 'none', 
-                      borderRadius: '8px', 
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '14px',
-                      transition: 'background 0.3s'
-                    }}
-                    onMouseOver={(e) => e.target.style.background = '#e8eaed'}
-                    onMouseOut={(e) => e.target.style.background = '#f0f2f5'}
+                    className="btn-cancel"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={confirmDeleteEvent}
-                    style={{ 
-                      padding: '12px 30px', 
-                      background: '#ff7675', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '8px', 
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '14px',
-                      transition: 'background 0.3s'
-                    }}
-                    onMouseOver={(e) => e.target.style.background = '#ff6c6c'}
-                    onMouseOut={(e) => e.target.style.background = '#ff7675'}
+                    className="btn-delete-confirm"
                   >
                     Delete Event
                   </button>
@@ -264,27 +253,27 @@ const Dashboard = () => {
         )}
 
         {expandedEvent && (
-          <div style={styles.modalOverlay} onClick={() => setExpandedEvent(null)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0 }}>{expandedEvent.name}</h2>
-                <button onClick={() => setExpandedEvent(null)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>←</button>
+          <div className="modal-overlay" onClick={() => setExpandedEvent(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{expandedEvent.name}</h2>
+                <button onClick={() => setExpandedEvent(null)} className="modal-close-btn">←</button>
               </div>
               
               {/* INVITE SECTION (Organizer only) */}
               {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && (
-                <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #6c5ce7', borderRadius: '8px', position: 'relative' }}>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 'bold' }}>Invite more friends:</p>
-                  <div style={{ position: 'relative' }}>
+                <div className="invite-section">
+                  <p className="invite-title">Invite more friends:</p>
+                  <div className="search-input-container">
                     <input 
                       type="text" 
                       placeholder="Search by name..." 
                       value={inviteSearchTerm} 
-                      onChange={e => setInviteSearchTerm(e.target.value)} 
-                      style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #ddd', boxSizing: 'border-box' }} 
+                      onChange={e => setInviteSearchTerm(e.target.value)}
+                      className="invite-search-input"
                     />
                     {inviteSearchResults.length > 0 && !selectedInviteUser && (
-                      <div style={{ position: 'absolute', width: '100%', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '5px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '5px' }}>
+                      <div className="search-results">
                         {inviteSearchResults.map(u => (
                           <div 
                             key={u._id} 
@@ -292,8 +281,8 @@ const Dashboard = () => {
                               setSelectedInviteUser(u);
                               setInviteSearchTerm(u.name);
                               setInviteSearchResults([]);
-                            }} 
-                            style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }}
+                            }}
+                            className="search-result-item"
                           >
                             {u.name} ({u.email})
                           </div>
@@ -302,14 +291,14 @@ const Dashboard = () => {
                     )}
                   </div>
                   {selectedInviteUser && (
-                    <div style={{ marginTop: '8px', padding: '8px 10px', backgroundColor: '#f0f2f5', borderRadius: '5px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="selected-user">
                       <span>Selected: <strong>{selectedInviteUser.name}</strong></span>
-                      <div style={{ display: 'flex', gap: '5px' }}>
+                      <div className="selected-user-buttons">
                         <button 
                           onClick={() => { 
                             handleInvite({ preventDefault: () => {} }, expandedEvent._id);
                           }}
-                          style={{ background: '#6c5ce7', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                          className="btn-invite"
                         >
                           ✓ Invite
                         </button>
@@ -318,7 +307,7 @@ const Dashboard = () => {
                             setSelectedInviteUser(null);
                             setInviteSearchTerm('');
                           }}
-                          style={{ background: '#ddd', color: '#333', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}
+                          className="btn-invite-cancel"
                         >
                           ✕ Cancel
                         </button>
@@ -328,15 +317,15 @@ const Dashboard = () => {
                 </div>
               )}
 
-              <h4>Who's Coming:</h4>
-              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
+              <h4 className="guests-coming-title">Who's Coming:</h4>
+              <div className="guests-list">
                 {expandedEvent.attendees?.map(a => (
-                  <div key={a._id} style={{ background: '#dfe6e9', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <div key={a._id} className="guest-badge guest-coming">
                     {a.name}
                     {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && String(a._id) !== String(currentUserId) && (
                       <button 
                         onClick={() => handleRemoveAttendee(expandedEvent._id, a._id)}
-                        style={{ background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', padding: '0 2px' }}
+                        className="guest-remove-btn"
                       >
                         ✕
                       </button>
@@ -348,17 +337,17 @@ const Dashboard = () => {
               {/* Who's Not Coming Section */}
               {expandedEvent.invitedGuests && expandedEvent.invitedGuests.length > 0 && (
                 <>
-                  <h4>Who's Not Coming:</h4>
-                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                  <h4 className="guests-not-coming-title">Who's Not Coming:</h4>
+                  <div className="guests-list">
                     {expandedEvent.invitedGuests
                       .filter(guest => !expandedEvent.attendees?.some(a => String(a._id) === String(guest._id || guest)))
                       .map(guest => (
-                        <div key={guest._id || guest} style={{ background: '#ffcccc', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div key={guest._id || guest} className="guest-badge guest-not-coming">
                           {guest.name || 'Unknown User'}
                           {String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId) && (
                             <button 
                               onClick={() => handleRemoveAttendee(expandedEvent._id, guest._id || guest)}
-                              style={{ background: 'none', border: 'none', color: '#ff7675', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', padding: '0 2px' }}
+                              className="guest-remove-btn"
                             >
                               ✕
                             </button>
@@ -369,24 +358,50 @@ const Dashboard = () => {
                 </>
               )}
               
-              <h4>Items:</h4>
-              <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px' }}>
+              <h4 className="items-title">Items:</h4>
+              <div className="items-list">
                 {expandedEvent.items.map(item => (
-                  <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                  <div key={item._id} className="item">
                     <span>{item.name} ({item.addedByName})</span>
                     {(String(item.addedBy) === String(currentUserId) || String(expandedEvent.creator?._id || expandedEvent.creator) === String(currentUserId)) && (
-                      <button onClick={() => handleDeleteItem(expandedEvent._id, item._id)} style={{ border: 'none', background: 'none', color: 'red' }}>✕</button>
+                      <button onClick={() => handleDeleteItem(expandedEvent._id, item._id)} className="item-delete-btn">✕</button>
                     )}
                   </div>
                 ))}
               </div>
 
-              <form onSubmit={(e) => handleAddItem(e, expandedEvent._id)} style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                <input placeholder="Add item..." value={newItemName} onChange={e => setNewItemName(e.target.value)} style={{ flex: 1, padding: '8px' }} />
-                <button type="submit" style={{ padding: '8px 15px', background: '#00b894', color: 'white', border: 'none', borderRadius: '5px' }}>Add</button>
+              <form onSubmit={(e) => handleAddItem(e, expandedEvent._id)} className="add-item-form">
+                <input 
+                  placeholder="Add item..." 
+                  value={newItemName} 
+                  onChange={e => setNewItemName(e.target.value)} 
+                  disabled={isAddingItem}
+                  className="add-item-input"
+                />
+                <button type="submit" disabled={isAddingItem} className="btn-add-item">
+                  {isAddingItem ? 'Adding...' : 'Add'}
+                </button>
               </form>
 
-              <button onClick={() => setExpandedEvent(null)} style={{ width: '100%', padding: '12px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '8px', marginTop: '20px', fontWeight: 'bold', cursor: 'pointer' }}>← Back to Dashboard</button>
+              <button onClick={() => setExpandedEvent(null)} className="btn-back">← Back to Dashboard</button>
+            </div>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="modal-overlay" onClick={() => setErrorMessage(null)}>
+            <div className="error-modal-content" onClick={e => e.stopPropagation()}>
+              <div className="error-icon">📦</div>
+              <h2>Hold on!</h2>
+              <p>
+                {errorMessage}
+              </p>
+              <button 
+                onClick={() => setErrorMessage(null)}
+                className="btn-error-close"
+              >
+                Got it! 👍
+              </button>
             </div>
           </div>
         )}

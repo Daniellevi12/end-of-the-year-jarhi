@@ -1,0 +1,611 @@
+/* ================================================================
+   ROOT & GLOBAL STYLES
+   ================================================================ */
+
+.dashboard-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 40px 20px;
+  font-family: sans-serif;
+}
+
+.dashboard-wrapper {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+
+/* ================================================================
+   HEADER & NAVIGATION
+   ================================================================ */
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.dashboard-header h1 {
+  margin: 0 0 5px 0;
+}
+
+.dashboard-header p {
+  margin: 0;
+  font-size: 16px;
+  color: #636e72;
+}
+
+.dashboard-button-group {
+  display: flex;
+  gap: 10px;
+}
+
+/* ================================================================
+   BUTTONS
+   ================================================================ */
+
+/* Navigation Buttons */
+.btn-home {
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #00b894 0%, #00a382 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 184, 148, 0.4);
+  transition: transform 0.2s;
+}
+
+.btn-logout {
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transition: transform 0.2s;
+}
+
+/* Primary Action Button */
+.btn-create-event {
+  padding: 12px 24px;
+  background: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  margin-bottom: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-create-event:hover {
+  background: #5e4db7;
+}
+
+/* RSVP Buttons */
+.btn-coming {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.btn-coming.active {
+  background-color: #00b894;
+  color: white;
+}
+
+.btn-coming.inactive {
+  background-color: #f0f2f5;
+  color: #636e72;
+}
+
+.btn-not-coming {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.btn-not-coming.active {
+  background-color: #ff7675;
+  color: white;
+}
+
+.btn-not-coming.inactive {
+  background-color: #f0f2f5;
+  color: #636e72;
+}
+
+.btn-not-coming:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Action Buttons */
+.btn-cancel {
+  padding: 12px 30px;
+  background: #f0f2f5;
+  color: #2d3436;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.btn-cancel:hover {
+  background: #e8eaed;
+}
+
+.btn-delete-confirm {
+  padding: 12px 30px;
+  background: #ff7675;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.btn-delete-confirm:hover {
+  background: #ff6c6c;
+}
+
+/* Invite Buttons */
+.btn-invite {
+  background: #6c5ce7;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.btn-invite:hover {
+  background: #5e4db7;
+}
+
+.btn-invite-cancel {
+  background: #ddd;
+  color: #333;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.btn-invite-cancel:hover {
+  background: #ccc;
+}
+
+/* Add Item Button */
+.btn-add-item {
+  padding: 8px 15px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.btn-add-item:not(:disabled) {
+  background: #00b894;
+}
+
+.btn-add-item:disabled {
+  background: #888;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.btn-add-item:hover:not(:disabled) {
+  background: #00a382;
+}
+
+/* Back Button */
+.btn-back {
+  width: 100%;
+  padding: 12px;
+  background: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  margin-top: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-back:hover {
+  background: #5e4db7;
+}
+
+/* Error Close Button */
+.btn-error-close {
+  padding: 14px 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-error-close:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.6);
+}
+
+
+/* ================================================================
+   CARDS & GRID
+   ================================================================ */
+
+.event-form-container {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+}
+
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.event-card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.event-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.event-card h3 {
+  margin: 0 0 10px 0;
+}
+
+.event-card p {
+  margin: 10px 0;
+  color: #636e72;
+}
+
+.event-card-delete-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: #ff7675;
+  cursor: pointer;
+  font-size: 18px;
+  transition: color 0.2s;
+}
+
+.event-card-delete-btn:hover {
+  color: #ff5252;
+}
+
+.rsvp-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+
+/* ================================================================
+   MODALS
+   ================================================================ */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.modal-close-btn:hover {
+  opacity: 0.7;
+}
+
+/* Delete Confirmation Modal */
+.delete-confirm-content {
+  text-align: center;
+}
+
+.delete-confirm-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.delete-confirm-content h2 {
+  margin-top: 0;
+  color: #2d3436;
+}
+
+.delete-confirm-content p {
+  font-size: 16px;
+  color: #636e72;
+  margin-bottom: 30px;
+}
+
+.delete-button-group {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+/* Error Modal */
+.error-modal-content {
+  background: white;
+  padding: 40px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+}
+
+.error-modal-content h2 {
+  margin: 0 0 15px 0;
+  color: #2d3436;
+  font-size: 24px;
+}
+
+.error-modal-content p {
+  font-size: 16px;
+  color: #636e72;
+  margin: 0 0 30px 0;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+
+/* ================================================================
+   FORMS & INPUTS
+   ================================================================ */
+
+.invite-section {
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #6c5ce7;
+  border-radius: 8px;
+  position: relative;
+}
+
+.invite-title {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.search-input-container {
+  position: relative;
+}
+
+.invite-search-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  box-sizing: border-box;
+}
+
+.search-results {
+  position: absolute;
+  width: 100%;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 5px;
+}
+
+.search-result-item {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.search-result-item:hover {
+  background: #f0f2f5;
+}
+
+.selected-user {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background-color: #f0f2f5;
+  border-radius: 5px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-user-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+/* Add Item Form */
+.add-item-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.add-item-input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.add-item-input:disabled {
+  opacity: 0.6;
+  background-color: #f0f2f5;
+}
+
+
+/* ================================================================
+   GUESTS & ATTENDEES
+   ================================================================ */
+
+.guests-coming-title,
+.guests-not-coming-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.guests-list {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.guest-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.guest-coming {
+  background: #dfe6e9;
+}
+
+.guest-not-coming {
+  background: #ffcccc;
+}
+
+.guest-remove-btn {
+  background: none;
+  border: none;
+  color: #ff7675;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 0 2px;
+  transition: color 0.2s;
+}
+
+.guest-remove-btn:hover {
+  color: #ff5252;
+}
+
+
+/* ================================================================
+   ITEMS SECTION
+   ================================================================ */
+
+.items-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.items-list {
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.item-delete-btn {
+  border: none;
+  background: none;
+  color: red;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.item-delete-btn:hover {
+  color: #ff5252;
+}
