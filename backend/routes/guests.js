@@ -1,36 +1,21 @@
 const express = require("express");
 const router = express.Router();
-const Guest = require("../models/Guest");
+const guestController = require("../controllers/guestController");
+const { verifyToken } = require("../middleware/authMiddleware");
 
-// GET all guests
-router.get("/", async (req, res) => {
-  const guests = await Guest.find();
-  res.json(guests);
-});
+// GET all guests for a specific event (requires eventId query parameter)
+router.get("/", verifyToken, guestController.getAllGuests);
 
 // GET guest by ID
-router.get("/:id", async (req, res) => {
-  const guest = await Guest.findById(req.params.id);
-  res.json(guest);
-});
+router.get("/:id", verifyToken, guestController.getGuestById);
 
 // POST create guest
-router.post("/", async (req, res) => {
-  const guest = new Guest(req.body);
-  await guest.save();
-  res.status(201).json(guest);
-});
+router.post("/", verifyToken, guestController.createGuest);
 
-// PUT update guest
-router.put("/:id", async (req, res) => {
-  const guest = await Guest.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(guest);
-});
+// PUT update guest (status, comment, etc.)
+router.put("/:id", verifyToken, guestController.updateGuest);
 
 // DELETE guest
-router.delete("/:id", async (req, res) => {
-  await Guest.findByIdAndDelete(req.params.id);
-  res.json({ message: "Guest deleted" });
-});
+router.delete("/:id", verifyToken, guestController.deleteGuest);
 
 module.exports = router;

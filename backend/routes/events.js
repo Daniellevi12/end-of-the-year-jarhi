@@ -1,36 +1,33 @@
 const express = require("express");
 const router = express.Router();
-const Event = require("../models/Event");
+const eventController = require("../controllers/eventController");
+const { verifyToken } = require("../middleware/authMiddleware");
 
-// GET all events
-router.get("/", async (req, res) => {
-  const events = await Event.find();
-  res.json(events);
-});
+// GET events for specific user
+router.get("/", verifyToken, eventController.getUserEvents);
 
-// GET event by ID
-router.get("/:id", async (req, res) => {
-  const event = await Event.findById(req.params.id);
-  res.json(event);
-});
+// GET all users (For the invite list)
+router.get("/users", verifyToken, eventController.getAllUsers);
 
 // POST create event
-router.post("/", async (req, res) => {
-  const event = new Event(req.body);
-  await event.save();
-  res.status(201).json(event);
-});
+router.post("/", verifyToken, eventController.createEvent);
 
-// PUT update event
-router.put("/:id", async (req, res) => {
-  const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(event);
-});
+// POST Invite Guest
+router.post("/:eventId/invite", verifyToken, eventController.inviteGuest);
 
-// DELETE event
-router.delete("/:id", async (req, res) => {
-  await Event.findByIdAndDelete(req.params.id);
-  res.json({ message: "Event deleted" });
-});
+// POST RSVP
+router.post("/:eventId/rsvp", verifyToken, eventController.rsvpEvent);
+
+// DELETE EVENT
+router.delete("/:eventId", verifyToken, eventController.deleteEvent);
+
+// REMOVE USER FROM EVENT
+router.post("/:eventId/remove-guest", verifyToken, eventController.removeGuest);
+
+// ADD ITEM TO EVENT
+router.post("/:eventId/items", verifyToken, eventController.addItem);
+
+// DELETE ITEM FROM EVENT
+router.delete("/:eventId/items/:itemId", verifyToken, eventController.deleteItem);
 
 module.exports = router;
